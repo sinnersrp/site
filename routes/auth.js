@@ -12,7 +12,20 @@ const router = express.Router();
 const httpsAgent = new https.Agent({
   keepAlive: true,
   lookup: (hostname, options, callback) => {
-    return dns.lookup(hostname, { family: 4 }, callback);
+    if (typeof options === "function") {
+      callback = options;
+      options = {};
+    }
+
+    return dns.lookup(
+      hostname,
+      {
+        ...options,
+        family: 4,
+        all: false
+      },
+      callback
+    );
   }
 });
 
@@ -54,7 +67,7 @@ router.get("/discord", (req, res) => {
     const url = `https://discord.com/oauth2/authorize?${params.toString()}`;
 
     console.log("Iniciando login Discord");
-    console.log("Callback URL:", String(process.env.DISCORD_CALLBACK_URL || "").trim());
+    console.log("URL de retorno:", String(process.env.DISCORD_CALLBACK_URL || "").trim());
     console.log("State gerado:", state);
 
     return req.session.save(() => {
