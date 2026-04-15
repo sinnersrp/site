@@ -10,117 +10,68 @@
   </p>
 </section>
 
-<section class="container grid">
-  <div class="card stat-card">
-    <h3>Total farm da semana</h3>
-    <p class="big">R$ <%= resumoGeral.totalFarmSemana.toLocaleString("pt-BR") %></p>
-  </div>
-  <div class="card stat-card">
-    <h3>Membros monitorados</h3>
-    <p class="big"><%= resumoGeral.membrosMonitorados %></p>
-  </div>
-  <div class="card stat-card">
-    <h3>Metas batidas</h3>
-    <p class="big"><%= resumoGeral.membrosComMetaBatida %></p>
-  </div>
-  <div class="card stat-card">
-    <h3>Metas pendentes</h3>
-    <p class="big"><%= resumoGeral.membrosPendentes %></p>
-  </div>
+<section class="container card">
+  <h2>Ranking semanal de farm</h2>
+
+  <% if (!ranking.length) { %>
+    <p>Nenhum farm registrado ainda nesta semana.</p>
+  <% } else { %>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Membro</th>
+          <th>Cargo</th>
+          <th>Total</th>
+          <th>Meta</th>
+          <th>Falta</th>
+          <th>%</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% ranking.forEach(item => { %>
+          <tr>
+            <td><%= item.username %></td>
+            <td><%= item.cargo %></td>
+            <td>R$ <%= item.total.toLocaleString("pt-BR") %></td>
+            <td>R$ <%= item.meta.toLocaleString("pt-BR") %></td>
+            <td>R$ <%= item.falta.toLocaleString("pt-BR") %></td>
+            <td><%= item.percentual.toFixed(1) %>%</td>
+            <td><%= item.status %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
 </section>
 
 <section class="container grid">
-  <div class="card stat-card">
-    <h3>Dinheiro sujo total</h3>
-    <p class="big">R$ <%= Number(caixa.dinheiroSujoTotal || 0).toLocaleString("pt-BR") %></p>
-  </div>
-  <div class="card stat-card">
-    <h3>Sujo disponível</h3>
-    <p class="big">R$ <%= Number(caixa.dinheiroSujoDisponivel || 0).toLocaleString("pt-BR") %></p>
-  </div>
-  <div class="card stat-card">
-    <h3>Total lavado</h3>
-    <p class="big">R$ <%= Number(caixa.totalLavado || 0).toLocaleString("pt-BR") %></p>
-  </div>
-  <div class="card stat-card">
-    <h3>Caixa total</h3>
-    <p class="big">R$ <%= Number(caixa.caixaTotal || 0).toLocaleString("pt-BR") %></p>
-  </div>
-</section>
-
-<section class="container grid admin-grid-2">
   <div class="card">
-    <h2>Ranking semanal de farm</h2>
+    <h2>Estoque atual</h2>
 
-    <% if (!ranking.length) { %>
-      <p>Nenhum farm registrado ainda nesta semana.</p>
+    <% if (!estoque.length) { %>
+      <p>Sem itens no estoque.</p>
     <% } else { %>
       <table class="table">
         <thead>
           <tr>
-            <th>Membro</th>
-            <th>Cargo</th>
-            <th>Total</th>
-            <th>Meta</th>
-            <th>Falta</th>
-            <th>Registros</th>
-            <th>Status</th>
+            <th>Item</th>
+            <th>Tipo</th>
+            <th>Quantidade</th>
           </tr>
         </thead>
         <tbody>
-          <% ranking.forEach(item => { %>
+          <% estoque.forEach(item => { %>
             <tr>
-              <td><%= item.username %></td>
-              <td><%= item.cargo %></td>
-              <td>R$ <%= Number(item.total || 0).toLocaleString("pt-BR") %></td>
-              <td>R$ <%= Number(item.meta || 0).toLocaleString("pt-BR") %></td>
-              <td>R$ <%= Number(item.falta || 0).toLocaleString("pt-BR") %></td>
-              <td><%= item.registros %></td>
-              <td><span class="status-pill <%= item.status === 'Bateu meta' ? 'status-ok' : 'status-pending' %>"><%= item.status %></span></td>
+              <td><%= item.item %></td>
+              <td><%= item.tipo %></td>
+              <td><%= item.quantidade %></td>
             </tr>
           <% }) %>
         </tbody>
       </table>
     <% } %>
   </div>
-
-  <div class="card">
-    <h2>Resumo do estoque</h2>
-    <p><strong>Total de unidades:</strong> <%= resumoGeral.itensNoEstoque %></p>
-    <p><strong>Tipos gerais:</strong> <%= resumoGeral.itensGerais %></p>
-    <p><strong>Tipos de armas:</strong> <%= resumoGeral.itensArmas %></p>
-    <p>
-      <strong>Última sincronização do caixa:</strong>
-      <%= caixa.ultimaSincronizacao ? new Date(caixa.ultimaSincronizacao).toLocaleString("pt-BR") : "Ainda não sincronizado" %>
-    </p>
-  </div>
-</section>
-
-<section class="container card">
-  <h2>Estoque atual do baú</h2>
-
-  <% if (!estoque.length) { %>
-    <p>Sem itens no estoque.</p>
-  <% } else { %>
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Item</th>
-          <th>Tipo</th>
-          <th>Quantidade</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% estoque.forEach(item => { %>
-          <tr>
-            <td><%= item.item %></td>
-            <td><%= item.tipo %></td>
-            <td><%= item.quantidade %></td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  <% } %>
 </section>
 
 <section class="container card">
@@ -133,12 +84,10 @@
       <thead>
         <tr>
           <th>Usuário</th>
-          <th>Cargo</th>
           <th>Ação</th>
-          <th>Origem</th>
           <th>Item</th>
           <th>Qtd</th>
-          <th>Canal</th>
+          <th>Tipo</th>
           <th>Data</th>
         </tr>
       </thead>
@@ -146,44 +95,11 @@
         <% movimentacoes.forEach(item => { %>
           <tr>
             <td><%= item.username %></td>
-            <td><%= item.cargo %></td>
             <td><%= item.acao %></td>
-            <td><%= item.tipo %></td>
-            <td><%= item.itemOriginal || item.item %></td>
+            <td><%= item.item %></td>
             <td><%= item.quantidade %></td>
-            <td><%= item.canalNome %></td>
-            <td><%= new Date(item.registradoEm || item.createdAt).toLocaleString("pt-BR") %></td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  <% } %>
-</section>
-
-<section class="container card">
-  <h2>Últimas movimentações do caixa</h2>
-
-  <% if (!movimentacoesCaixa.length) { %>
-    <p>Nenhuma movimentação de caixa encontrada.</p>
-  <% } else { %>
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Responsável</th>
-          <th>Tipo</th>
-          <th>Valor</th>
-          <th>Observação</th>
-          <th>Data</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% movimentacoesCaixa.forEach(item => { %>
-          <tr>
-            <td><%= item.responsavelTag %></td>
             <td><%= item.tipo %></td>
-            <td>R$ <%= Number(item.valor || 0).toLocaleString("pt-BR") %></td>
-            <td><%= item.observacao || "-" %></td>
-            <td><%= new Date(item.registradoEm || item.createdAt).toLocaleString("pt-BR") %></td>
+            <td><%= new Date(item.createdAt).toLocaleString("pt-BR") %></td>
           </tr>
         <% }) %>
       </tbody>

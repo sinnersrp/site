@@ -18,40 +18,28 @@
 </section>
 
 <section class="container grid">
-  <div class="card stat-card">
+  <div class="card">
     <h3>Farm da semana</h3>
     <p class="big">R$ <%= totalFarm.toLocaleString("pt-BR") %></p>
   </div>
 
-  <div class="card stat-card">
+  <div class="card">
     <h3>Meta semanal</h3>
     <p class="big">R$ <%= metaSemanal.toLocaleString("pt-BR") %></p>
   </div>
 
-  <div class="card stat-card">
+  <div class="card">
     <h3>Falta bater</h3>
     <p class="big">R$ <%= falta.toLocaleString("pt-BR") %></p>
   </div>
 </section>
 
 <section class="container grid">
-  <div class="card stat-card">
+  <div class="card">
     <h3>Status da meta</h3>
     <p class="big"><%= statusMeta === "batida" ? "✅ Batida" : "⏳ Pendente" %></p>
   </div>
 
-  <div class="card stat-card">
-    <h3>Família recebe</h3>
-    <p class="big">R$ <%= resumoMeta.valorFamilia.toLocaleString("pt-BR") %></p>
-  </div>
-
-  <div class="card stat-card">
-    <h3>Limpo estimado</h3>
-    <p class="big">R$ <%= resumoMeta.valorLimpo.toLocaleString("pt-BR") %></p>
-  </div>
-</section>
-
-<section class="container grid">
   <div class="card">
     <h3>Progresso</h3>
     <div class="progress-wrap">
@@ -60,13 +48,6 @@
       </div>
       <p><strong><%= percentual.toFixed(1) %>%</strong> concluído</p>
     </div>
-  </div>
-
-  <div class="card">
-    <h3>Resumo da meta</h3>
-    <p><strong>Excedente:</strong> R$ <%= resumoMeta.excedente.toLocaleString("pt-BR") %></p>
-    <p><strong>Faltante:</strong> R$ <%= resumoMeta.faltante.toLocaleString("pt-BR") %></p>
-    <p><strong>Registros:</strong> <%= meusRegistros.length %></p>
   </div>
 
   <div class="card">
@@ -88,25 +69,15 @@
           <th>Valor</th>
           <th>Cargo</th>
           <th>Origem</th>
-          <th>Obs.</th>
-          <th>Comprovante</th>
           <th>Data</th>
         </tr>
       </thead>
       <tbody>
         <% meusRegistros.forEach(item => { %>
           <tr>
-            <td>R$ <%= Number(item.valor || 0).toLocaleString("pt-BR") %></td>
+            <td>R$ <%= item.valor.toLocaleString("pt-BR") %></td>
             <td><%= item.cargo %></td>
             <td><%= item.origem %></td>
-            <td><%= item.observacao || "-" %></td>
-            <td>
-              <% if (item.comprovante) { %>
-                <a href="<%= item.comprovante %>" target="_blank" rel="noopener noreferrer">Ver</a>
-              <% } else { %>
-                -
-              <% } %>
-            </td>
             <td><%= new Date(item.registradoEm).toLocaleString("pt-BR") %></td>
           </tr>
         <% }) %>

@@ -14,17 +14,12 @@ const farmRegistroSchema = new mongoose.Schema(
     cargo: {
       type: String,
       required: true,
-      enum: ["membro", "gerente", "lider", "ajuste"],
-      default: "membro"
+      enum: ["membro", "gerente", "lider"]
     },
     valor: {
       type: Number,
       required: true,
       min: 1
-    },
-    comprovante: {
-      type: String,
-      default: ""
     },
     semanaId: {
       type: String,

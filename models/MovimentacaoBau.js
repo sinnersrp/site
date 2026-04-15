@@ -1,91 +1,47 @@
 const mongoose = require("mongoose");
 
-const TIPOS_VALIDOS = ["bau_gerencia", "controle_bau"];
-const ACOES_VALIDAS = [
-  "entrada",
-  "saida",
-  "transferir",
-  "transferencia_controle",
-  "liberar",
-  "retirar",
-  "devolver"
-];
-const CARGOS_VALIDOS = ["gerencia", "membro"];
-
 const movimentacaoBauSchema = new mongoose.Schema(
   {
     userId: {
       type: String,
-      required: true,
-      trim: true
+      required: true
     },
     username: {
       type: String,
-      required: true,
-      trim: true
-    },
-    item: {
-      type: String,
-      required: true,
-      trim: true,
-      lowercase: true
-    },
-    itemOriginal: {
-      type: String,
-      default: "",
-      trim: true
-    },
-    quantidade: {
-      type: Number,
-      required: true,
-      min: 1
-    },
-    tipoMovimentacao: {
-      type: String,
-      required: true,
-      enum: ACOES_VALIDAS
-    },
-    observacao: {
-      type: String,
-      default: "Sem observação",
-      trim: true
-    },
-    canalId: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    canalNome: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    tipo: {
-      type: String,
-      required: true,
-      enum: TIPOS_VALIDOS
-    },
-    acao: {
-      type: String,
-      required: true,
-      enum: ACOES_VALIDAS
+      required: true
     },
     cargo: {
       type: String,
-      required: true,
-      enum: CARGOS_VALIDOS
+      required: true
     },
-    registradoEm: {
-      type: Date,
-      default: Date.now
+    acao: {
+      type: String,
+      enum: ["liberou", "retirou", "devolveu", "entrada_gerencia", "saida_gerencia"],
+      required: true
+    },
+    item: {
+      type: String,
+      required: true
+    },
+    quantidade: {
+      type: Number,
+      required: true
+    },
+    tipo: {
+      type: String,
+      enum: ["geral", "arma"],
+      required: true
+    },
+    canalId: {
+      type: String,
+      required: false
+    },
+    canalNome: {
+      type: String,
+      required: false
     }
   },
   { timestamps: true }
 );
-
-movimentacaoBauSchema.index({ registradoEm: -1 });
-movimentacaoBauSchema.index({ item: 1, registradoEm: -1 });
-movimentacaoBauSchema.index({ canalId: 1, registradoEm: -1 });
-movimentacaoBauSchema.index({ tipo: 1, acao: 1, registradoEm: -1 });
 
 module.exports = mongoose.model("MovimentacaoBau", movimentacaoBauSchema);
