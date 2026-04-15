@@ -1,18 +1,15 @@
 const passport = require("passport");
 const DiscordStrategy = require("passport-discord").Strategy;
-const axios = require("axios");
 const mongoose = require("mongoose");
 const User = require("../models/User");
-const { guildId, cargosMap, grupos } = require("./roles");
+const { cargosMap, grupos } = require("./roles");
 
 passport.serializeUser((user, done) => {
-  // Salva o _id do Mongo na sessão
   done(null, user?._id?.toString() || null);
 });
 
 passport.deserializeUser(async (id, done) => {
   try {
-    // Evita erro quando a sessão antiga ou inválida mandar id vazio/undefined
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       return done(null, false);
     }
@@ -49,10 +46,10 @@ function descobrirRolePrincipal(siteRoles = []) {
 passport.use(
   new DiscordStrategy(
     {
-      clientID: process.env.DISCORD_CLIENT_ID,
-      clientSecret: process.env.DISCORD_CLIENT_SECRET,
-      callbackURL: process.env.DISCORD_CALLBACK_URL,
-      scope: ["identify", "guilds", "guilds.members.read"]
+      clientID: String(process.env.DISCORD_CLIENT_ID || "").trim(),
+      clientSecret: String(process.env.DISCORD_CLIENT_SECRET || "").trim(),
+      callbackURL: String(process.env.DISCORD_CALLBACK_URL || "").trim(),
+      scope: ["identify", "guilds"]
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
@@ -64,34 +61,19 @@ passport.use(
         let siteRoles = [];
         let role = "membro";
 
-        try {
-          const memberResponse = await axios.get(
-            `https://discord.com/api/v10/users/@me/guilds/${guildId}/member`,
-            {
-              headers: {
-                Authorization: `Bearer ${accessToken}`
-              }
-            }
-          );
-
-          discordRoles = memberResponse.data.roles || [];
-          siteRoles = descobrirSiteRoles(discordRoles);
-          role = descobrirRolePrincipal(siteRoles);
-        } catch (err) {
-          console.log("Não foi possível buscar cargos do membro no Discord.");
-          console.log(err.response?.data || err.message);
-        }
-
-        let user = await User.findOne({ discordId: profile.id });
-
         const guilds =
           profile.guilds?.map((g) => ({
             id: g.id,
             name: g.name,
             icon: g.icon || null,
             owner: g.owner || false,
-            permissions: g.permissions || 0
+            permissions: String(g.permissions || "0")
           })) || [];
+
+        siteRoles = descobrirSiteRoles(discordRoles);
+        role = descobrirRolePrincipal(siteRoles);
+
+        let user = await User.findOne({ discordId: profile.id });
 
         if (!user) {
           user = await User.create({

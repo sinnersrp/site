@@ -6,7 +6,7 @@ const router = express.Router();
 router.get(
   "/discord",
   passport.authenticate("discord", {
-    scope: ["identify", "guilds", "guilds.members.read"]
+    scope: ["identify", "guilds"]
   })
 );
 
