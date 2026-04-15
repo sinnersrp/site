@@ -1,33 +1,11 @@
 const express = require("express");
 const crypto = require("crypto");
 const axios = require("axios");
-const https = require("https");
-const dns = require("dns");
 
 const User = require("../models/User");
 const { guildId, cargosMap, grupos } = require("../config/roles");
 
 const router = express.Router();
-
-const httpsAgent = new https.Agent({
-  keepAlive: true,
-  lookup: (hostname, options, callback) => {
-    if (typeof options === "function") {
-      callback = options;
-      options = {};
-    }
-
-    return dns.lookup(
-      hostname,
-      {
-        ...options,
-        family: 4,
-        all: false
-      },
-      callback
-    );
-  }
-});
 
 function descobrirSiteRoles(memberRoleIds = []) {
   const rolesEncontradas = [];
@@ -68,7 +46,7 @@ router.get("/discord", (req, res) => {
 
     console.log("Iniciando login Discord");
     console.log("URL de retorno:", String(process.env.DISCORD_CALLBACK_URL || "").trim());
-    console.log("State gerado:", state);
+    console.log("Estado gerado:", state);
 
     return req.session.save(() => {
       res.redirect(url);
@@ -140,8 +118,7 @@ router.get("/discord/callback", async (req, res) => {
           "Content-Type": "application/x-www-form-urlencoded",
           "User-Agent": "SinnersFamily/1.0"
         },
-        timeout: 30000,
-        httpsAgent
+        timeout: 30000
       }
     );
 
@@ -154,8 +131,7 @@ router.get("/discord/callback", async (req, res) => {
         Authorization: `Bearer ${accessToken}`,
         "User-Agent": "SinnersFamily/1.0"
       },
-      timeout: 30000,
-      httpsAgent
+      timeout: 30000
     });
 
     console.log("Perfil do Discord carregado");
@@ -165,8 +141,7 @@ router.get("/discord/callback", async (req, res) => {
         Authorization: `Bearer ${accessToken}`,
         "User-Agent": "SinnersFamily/1.0"
       },
-      timeout: 30000,
-      httpsAgent
+      timeout: 30000
     });
 
     console.log("Guildas do Discord carregadas");
@@ -191,8 +166,7 @@ router.get("/discord/callback", async (req, res) => {
               Authorization: `Bot ${String(process.env.DISCORD_BOT_TOKEN).trim()}`,
               "User-Agent": "SinnersFamily/1.0"
             },
-            timeout: 30000,
-            httpsAgent
+            timeout: 30000
           }
         );
 
