@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a href="/" class="logo">SINNERS FAMILY</a>
+
+      <nav class="nav">
+        <% if (user) { %>
+          <a href="/dashboard">Painel</a>
+          <% if (user.role === "lider" || user.role === "gerente") { %>
+            <a href="/admin">Admin</a>
+          <% } %>
+          <a href="/auth/logout">Sair</a>
+        <% } else { %>
+          <a href="/auth/discord">Entrar com Discord</a>
+        <% } %>
+      </nav>
+    </div>
+  </header>
+
+  <main>

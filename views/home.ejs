@@ -1,0 +1,51 @@
+<%- include("partials/header") %>
+
+<section class="home-hero">
+  <div class="home-overlay"></div>
+
+  <div class="home-content">
+    <div class="home-text">
+      <span class="badge-home">SINNERS FAMILY</span>
+      <h1>PAINEL OFICIAL DA FAMÍLIA</h1>
+      <p>
+        Controle completo de membros, farm semanal, estoque do baú,
+        movimentações, registros e acompanhamento da liderança.
+      </p>
+
+      <div class="home-buttons">
+        <% if (!user) { %>
+          <a class="btn-primary" href="/auth/discord">Entrar com Discord</a>
+        <% } else { %>
+          <a class="btn-primary" href="/dashboard">Ir para o painel</a>
+        <% } %>
+
+        <% if (user && (user.role === "lider" || user.role === "gerente")) { %>
+          <a class="btn-secondary" href="/admin">Painel Admin</a>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="home-image-card">
+      <img src="/img/sinners-banner.png" alt="Banner SINNERS FAMILY">
+    </div>
+  </div>
+</section>
+
+<section class="home-info-grid">
+  <div class="info-card">
+    <h3>Farm Semanal</h3>
+    <p>Acompanhe metas, progresso da semana e ranking dos membros.</p>
+  </div>
+
+  <div class="info-card">
+    <h3>Controle de Baú</h3>
+    <p>Veja estoque atual, entradas, saídas e devoluções registradas.</p>
+  </div>
+
+  <div class="info-card">
+    <h3>Painel da Liderança</h3>
+    <p>Gerentes e líderes têm visão completa da organização da família.</p>
+  </div>
+</section>
+
+<%- include("partials/footer") %>
