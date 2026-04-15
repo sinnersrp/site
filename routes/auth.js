@@ -1,11 +1,20 @@
 const express = require("express");
 const crypto = require("crypto");
 const axios = require("axios");
+const https = require("https");
+const dns = require("dns");
 
 const User = require("../models/User");
 const { guildId, cargosMap, grupos } = require("../config/roles");
 
 const router = express.Router();
+
+const httpsAgent = new https.Agent({
+  keepAlive: true,
+  lookup: (hostname, options, callback) => {
+    return dns.lookup(hostname, { family: 4 }, callback);
+  }
+});
 
 function descobrirSiteRoles(memberRoleIds = []) {
   const rolesEncontradas = [];
@@ -77,7 +86,9 @@ router.get("/discord/callback", async (req, res) => {
       });
     }
 
-    console.log("State salvo na sessão:", req.session.discordOAuthState);
+    console.log("Salvo de Estado na sessão:", req.session.discordOAuthState);
+    console.log("Code recebido:", !!code);
+    console.log("State recebido:", state);
 
     if (!code) {
       return res.status(400).render("error", {
@@ -106,14 +117,18 @@ router.get("/discord/callback", async (req, res) => {
       redirect_uri: String(process.env.DISCORD_CALLBACK_URL || "").trim()
     });
 
+    console.log("Iniciando troca de code por token no Discord...");
+
     const tokenResponse = await axios.post(
       "https://discord.com/api/oauth2/token",
       tokenParams.toString(),
       {
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": "SinnersFamily/1.0"
         },
-        timeout: 20000
+        timeout: 30000,
+        httpsAgent
       }
     );
 
@@ -123,18 +138,22 @@ router.get("/discord/callback", async (req, res) => {
 
     const profileResponse = await axios.get("https://discord.com/api/v10/users/@me", {
       headers: {
-        Authorization: `Bearer ${accessToken}`
+        Authorization: `Bearer ${accessToken}`,
+        "User-Agent": "SinnersFamily/1.0"
       },
-      timeout: 20000
+      timeout: 30000,
+      httpsAgent
     });
 
     console.log("Perfil do Discord carregado");
 
     const guildsResponse = await axios.get("https://discord.com/api/v10/users/@me/guilds", {
       headers: {
-        Authorization: `Bearer ${accessToken}`
+        Authorization: `Bearer ${accessToken}`,
+        "User-Agent": "SinnersFamily/1.0"
       },
-      timeout: 20000
+      timeout: 30000,
+      httpsAgent
     });
 
     console.log("Guildas do Discord carregadas");
@@ -156,9 +175,11 @@ router.get("/discord/callback", async (req, res) => {
           `https://discord.com/api/v10/guilds/${guildId}/members/${profile.id}`,
           {
             headers: {
-              Authorization: `Bot ${String(process.env.DISCORD_BOT_TOKEN).trim()}`
+              Authorization: `Bot ${String(process.env.DISCORD_BOT_TOKEN).trim()}`,
+              "User-Agent": "SinnersFamily/1.0"
             },
-            timeout: 20000
+            timeout: 30000,
+            httpsAgent
           }
         );
 
