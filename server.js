@@ -3,11 +3,10 @@ require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
 const MongoStore = require("connect-mongo");
-const passport = require("passport");
 const path = require("path");
 
 const connectDB = require("./config/db");
-require("./config/passport");
+const User = require("./models/User");
 
 const authRoutes = require("./routes/auth");
 const pageRoutes = require("./routes/pages");
@@ -43,12 +42,26 @@ app.use(
   })
 );
 
-app.use(passport.initialize());
-app.use(passport.session());
+app.use(async (req, res, next) => {
+  try {
+    req.user = null;
 
-app.use((req, res, next) => {
-  res.locals.user = req.user || null;
-  next();
+    if (req.session?.userId) {
+      const user = await User.findById(req.session.userId);
+      req.user = user || null;
+    }
+
+    req.isAuthenticated = () => !!req.user;
+    res.locals.user = req.user || null;
+
+    next();
+  } catch (error) {
+    console.error("Erro ao carregar sessão do usuário:", error);
+    req.user = null;
+    req.isAuthenticated = () => false;
+    res.locals.user = null;
+    next();
+  }
 });
 
 app.use("/auth", authRoutes);

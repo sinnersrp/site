@@ -6,7 +6,10 @@ const guildSchema = new mongoose.Schema(
     name: String,
     icon: String,
     owner: Boolean,
-    permissions: Number
+    permissions: {
+      type: String,
+      default: "0"
+    }
   },
   { _id: false }
 );

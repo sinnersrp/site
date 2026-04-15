@@ -1,5 +1,5 @@
 function ensureAuth(req, res, next) {
-  if (req.isAuthenticated && req.isAuthenticated()) {
+  if (req.user) {
     return next();
   }
 
@@ -7,11 +7,11 @@ function ensureAuth(req, res, next) {
 }
 
 function ensureLeader(req, res, next) {
-  if (!req.isAuthenticated || !req.isAuthenticated()) {
+  if (!req.user) {
     return res.redirect("/");
   }
 
-  if (req.user && (req.user.role === "lider" || req.user.role === "gerente")) {
+  if (req.user.role === "lider" || req.user.role === "gerente") {
     return next();
   }
 
