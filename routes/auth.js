@@ -1,13 +1,11 @@
 const express = require("express");
 const crypto = require("crypto");
 const axios = require("axios");
-const DiscordOAuth2 = require("discord-oauth2");
 
 const User = require("../models/User");
 const { guildId, cargosMap, grupos } = require("../config/roles");
 
 const router = express.Router();
-const oauth = new DiscordOAuth2();
 
 function descobrirSiteRoles(memberRoleIds = []) {
   const rolesEncontradas = [];
@@ -36,13 +34,15 @@ router.get("/discord", (req, res) => {
     const state = crypto.randomBytes(16).toString("hex");
     req.session.discordOAuthState = state;
 
-    const url = oauth.generateAuthUrl({
-      clientId: String(process.env.DISCORD_CLIENT_ID || "").trim(),
-      redirectUri: String(process.env.DISCORD_CALLBACK_URL || "").trim(),
-      responseType: "code",
-      scope: ["identify", "guilds"],
+    const params = new URLSearchParams({
+      client_id: String(process.env.DISCORD_CLIENT_ID || "").trim(),
+      redirect_uri: String(process.env.DISCORD_CALLBACK_URL || "").trim(),
+      response_type: "code",
+      scope: "identify guilds",
       state
     });
+
+    const url = `https://discord.com/oauth2/authorize?${params.toString()}`;
 
     console.log("Iniciando login Discord");
     console.log("Callback URL:", String(process.env.DISCORD_CALLBACK_URL || "").trim());
@@ -70,7 +70,6 @@ router.get("/discord/callback", async (req, res) => {
     const { code, state } = req.query;
 
     if (!req.session) {
-      console.log("Sessão não encontrada no callback");
       return res.status(500).render("error", {
         title: "Erro no login",
         user: null,
@@ -79,8 +78,6 @@ router.get("/discord/callback", async (req, res) => {
     }
 
     console.log("State salvo na sessão:", req.session.discordOAuthState);
-    console.log("Code recebido:", !!code);
-    console.log("State recebido:", state);
 
     if (!code) {
       return res.status(400).render("error", {
@@ -101,47 +98,44 @@ router.get("/discord/callback", async (req, res) => {
     delete req.session.discordOAuthState;
     console.log("State validado com sucesso");
 
-    const tokenData = await Promise.race([
-      oauth.tokenRequest({
-        clientId: String(process.env.DISCORD_CLIENT_ID || "").trim(),
-        clientSecret: String(process.env.DISCORD_CLIENT_SECRET || "").trim(),
-        code: String(code),
-        scope: "identify guilds",
-        grantType: "authorization_code",
-        redirectUri: String(process.env.DISCORD_CALLBACK_URL || "").trim()
-      }),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout ao trocar code por token")), 15000)
-      )
-    ]);
+    const tokenParams = new URLSearchParams({
+      client_id: String(process.env.DISCORD_CLIENT_ID || "").trim(),
+      client_secret: String(process.env.DISCORD_CLIENT_SECRET || "").trim(),
+      grant_type: "authorization_code",
+      code: String(code),
+      redirect_uri: String(process.env.DISCORD_CALLBACK_URL || "").trim()
+    });
+
+    const tokenResponse = await axios.post(
+      "https://discord.com/api/oauth2/token",
+      tokenParams.toString(),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        timeout: 20000
+      }
+    );
 
     console.log("Token obtido com sucesso");
 
-    const accessToken = tokenData.access_token;
+    const accessToken = tokenResponse.data.access_token;
 
-    const profileResponse = await Promise.race([
-      axios.get("https://discord.com/api/v10/users/@me", {
-        headers: {
-          Authorization: `Bearer ${accessToken}`
-        }
-      }),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout ao buscar perfil do Discord")), 15000)
-      )
-    ]);
+    const profileResponse = await axios.get("https://discord.com/api/v10/users/@me", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      },
+      timeout: 20000
+    });
 
     console.log("Perfil do Discord carregado");
 
-    const guildsResponse = await Promise.race([
-      axios.get("https://discord.com/api/v10/users/@me/guilds", {
-        headers: {
-          Authorization: `Bearer ${accessToken}`
-        }
-      }),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout ao buscar servidores do Discord")), 15000)
-      )
-    ]);
+    const guildsResponse = await axios.get("https://discord.com/api/v10/users/@me/guilds", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      },
+      timeout: 20000
+    });
 
     console.log("Guildas do Discord carregadas");
 
@@ -158,21 +152,15 @@ router.get("/discord/callback", async (req, res) => {
 
     if (process.env.DISCORD_BOT_TOKEN) {
       try {
-        console.log("Tentando buscar cargos do membro via bot");
-
-        const memberResponse = await Promise.race([
-          axios.get(
-            `https://discord.com/api/v10/guilds/${guildId}/members/${profile.id}`,
-            {
-              headers: {
-                Authorization: `Bot ${String(process.env.DISCORD_BOT_TOKEN).trim()}`
-              }
-            }
-          ),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Timeout ao buscar cargos do membro via bot")), 15000)
-          )
-        ]);
+        const memberResponse = await axios.get(
+          `https://discord.com/api/v10/guilds/${guildId}/members/${profile.id}`,
+          {
+            headers: {
+              Authorization: `Bot ${String(process.env.DISCORD_BOT_TOKEN).trim()}`
+            },
+            timeout: 20000
+          }
+        );
 
         discordRoles = memberResponse.data.roles || [];
         siteRoles = descobrirSiteRoles(discordRoles);
@@ -187,8 +175,6 @@ router.get("/discord/callback", async (req, res) => {
       console.log("DISCORD_BOT_TOKEN não encontrado. Usuário seguirá como membro.");
     }
 
-    let user = await User.findOne({ discordId: profile.id });
-
     const guildsFormatadas = guilds.map((g) => ({
       id: g.id,
       name: g.name,
@@ -197,9 +183,9 @@ router.get("/discord/callback", async (req, res) => {
       permissions: String(g.permissions || "0")
     }));
 
-    if (!user) {
-      console.log("Criando novo usuário no banco");
+    let user = await User.findOne({ discordId: profile.id });
 
+    if (!user) {
       user = await User.create({
         discordId: profile.id,
         username: profile.username,
@@ -211,8 +197,6 @@ router.get("/discord/callback", async (req, res) => {
         guilds: guildsFormatadas
       });
     } else {
-      console.log("Atualizando usuário existente no banco");
-
       user.username = profile.username;
       user.globalName = profile.global_name || profile.username;
       user.avatar = avatar;
@@ -220,12 +204,10 @@ router.get("/discord/callback", async (req, res) => {
       user.discordRoles = discordRoles;
       user.siteRoles = siteRoles;
       user.guilds = guildsFormatadas;
-
       await user.save();
     }
 
     req.session.userId = user._id.toString();
-    console.log("Usuário salvo na sessão:", req.session.userId);
 
     return req.session.save((err) => {
       if (err) {
@@ -246,7 +228,7 @@ router.get("/discord/callback", async (req, res) => {
     return res.status(500).render("error", {
       title: "Erro no login",
       user: null,
-      message: `Falha ao concluir o login com Discord: ${error.message}`
+      message: `Falha ao concluir o login com Discord: ${error.response?.data?.error_description || error.message}`
     });
   }
 });
