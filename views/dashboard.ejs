@@ -57,6 +57,26 @@
   </div>
 </section>
 
+<section class="container grid">
+  <div class="card">
+    <h3>Sujo total da facção</h3>
+    <p class="big">R$ <%= Number(caixa.dinheiroSujoTotal || 0).toLocaleString("pt-BR") %></p>
+  </div>
+
+  <div class="card">
+    <h3>Família recebe</h3>
+    <p class="big">R$ <%= Number(caixa.caixaTotal || 0).toLocaleString("pt-BR") %></p>
+  </div>
+
+  <div class="card">
+    <h3>Limpo estimado</h3>
+    <p class="big">R$ <%= Number(caixa.dinheiroLimpoTotal || 0).toLocaleString("pt-BR") %></p>
+    <% if (caixa.ultimaSincronizacao) { %>
+      <p class="muted">Atualizado em <%= new Date(caixa.ultimaSincronizacao).toLocaleString("pt-BR") %></p>
+    <% } %>
+  </div>
+</section>
+
 <section class="container card">
   <h2>Meus registros de farm</h2>
 
@@ -69,15 +89,23 @@
           <th>Valor</th>
           <th>Cargo</th>
           <th>Origem</th>
+          <th>Comprovante</th>
           <th>Data</th>
         </tr>
       </thead>
       <tbody>
         <% meusRegistros.forEach(item => { %>
           <tr>
-            <td>R$ <%= item.valor.toLocaleString("pt-BR") %></td>
+            <td>R$ <%= Number(item.valor || 0).toLocaleString("pt-BR") %></td>
             <td><%= item.cargo %></td>
-            <td><%= item.origem %></td>
+            <td><%= item.origem || "bot" %></td>
+            <td>
+              <% if (item.comprovante) { %>
+                <a class="table-link" href="<%= item.comprovante %>" target="_blank" rel="noopener noreferrer">Ver comprovante</a>
+              <% } else { %>
+                <span class="muted">Sem comprovante</span>
+              <% } %>
+            </td>
             <td><%= new Date(item.registradoEm).toLocaleString("pt-BR") %></td>
           </tr>
         <% }) %>

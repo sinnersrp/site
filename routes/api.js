@@ -3,6 +3,8 @@ const { ensureAuth, ensureLeader } = require("../middleware/auth");
 const ControleBau = require("../models/ControleBau");
 const MovimentacaoBau = require("../models/MovimentacaoBau");
 const FarmRegistro = require("../models/FarmRegistro");
+const CaixaFaccao = require("../models/CaixaFaccao");
+const MovimentacaoCaixa = require("../models/MovimentacaoCaixa");
 const getSemanaRP = require("../utils/semanaRP");
 const { metas } = require("../config/metas");
 
@@ -12,15 +14,18 @@ router.get("/me", ensureAuth, async (req, res) => {
   try {
     const semana = getSemanaRP();
 
-    const registros = await FarmRegistro.find({
-      userId: req.user.discordId,
-      registradoEm: {
-        $gte: semana.inicio,
-        $lte: semana.fim
-      }
-    }).sort({ registradoEm: -1 });
+    const [registros, caixa] = await Promise.all([
+      FarmRegistro.find({
+        userId: req.user.discordId,
+        registradoEm: {
+          $gte: semana.inicio,
+          $lte: semana.fim
+        }
+      }).sort({ registradoEm: -1 }),
+      CaixaFaccao.findOne({ key: "caixa_principal" })
+    ]);
 
-    const totalFarm = registros.reduce((acc, item) => acc + item.valor, 0);
+    const totalFarm = registros.reduce((acc, item) => acc + (Number(item.valor) || 0), 0);
     const meta = metas[req.user.role] || 100000;
 
     res.json({
@@ -38,7 +43,8 @@ router.get("/me", ensureAuth, async (req, res) => {
       falta: Math.max(meta - totalFarm, 0),
       percentual: meta > 0 ? Math.min((totalFarm / meta) * 100, 100) : 0,
       statusMeta: totalFarm >= meta ? "batida" : "pendente",
-      registros
+      registros,
+      caixa: caixa || null
     });
   } catch (error) {
     console.error("Erro em /api/me:", error);
@@ -48,7 +54,7 @@ router.get("/me", ensureAuth, async (req, res) => {
 
 router.get("/estoque", ensureLeader, async (req, res) => {
   try {
-    const estoque = await ControleBau.find().sort({ item: 1 });
+    const estoque = await ControleBau.find().sort({ tipo: 1, item: 1 });
     res.json(estoque);
   } catch (error) {
     console.error("Erro em /api/estoque:", error);
@@ -59,7 +65,7 @@ router.get("/estoque", ensureLeader, async (req, res) => {
 router.get("/movimentacoes", ensureLeader, async (req, res) => {
   try {
     const movimentacoes = await MovimentacaoBau.find()
-      .sort({ createdAt: -1 })
+      .sort({ registradoEm: -1, createdAt: -1 })
       .limit(100);
 
     res.json(movimentacoes);
@@ -83,17 +89,18 @@ router.get("/ranking", ensureLeader, async (req, res) => {
     const rankingMap = {};
 
     for (const registro of farmSemana) {
+      const cargoBase = registro.cargo === "ajuste" ? "membro" : registro.cargo;
       if (!rankingMap[registro.userId]) {
         rankingMap[registro.userId] = {
           userId: registro.userId,
           username: registro.username,
-          cargo: registro.cargo,
+          cargo: cargoBase,
           total: 0,
-          meta: metas[registro.cargo] || 100000
+          meta: metas[cargoBase] || 100000
         };
       }
 
-      rankingMap[registro.userId].total += registro.valor;
+      rankingMap[registro.userId].total += Number(registro.valor) || 0;
     }
 
     const ranking = Object.values(rankingMap)
@@ -105,91 +112,27 @@ router.get("/ranking", ensureLeader, async (req, res) => {
       }))
       .sort((a, b) => b.total - a.total);
 
-    res.json({
-      semana,
-      ranking
-    });
+    res.json({ semana, ranking });
   } catch (error) {
     console.error("Erro em /api/ranking:", error);
     res.status(500).json({ error: "Erro ao buscar ranking." });
   }
 });
 
-router.post("/farm/manual", ensureLeader, async (req, res) => {
+router.get("/financeiro", ensureLeader, async (req, res) => {
   try {
-    const { userId, username, cargo, valor, observacao } = req.body;
-
-    if (!userId || !username || !cargo || !valor) {
-      return res.status(400).json({ error: "Dados incompletos." });
-    }
-
-    const valorNumero = Number(valor);
-
-    if (Number.isNaN(valorNumero) || valorNumero <= 0) {
-      return res.status(400).json({ error: "Valor inválido." });
-    }
-
-    const semana = getSemanaRP();
-
-    const registro = await FarmRegistro.create({
-      userId,
-      username,
-      cargo,
-      valor: valorNumero,
-      semanaId: semana.semanaId,
-      registradoEm: new Date(),
-      origem: "site",
-      observacao: observacao || ""
-    });
+    const [caixa, movimentacoesCaixa] = await Promise.all([
+      CaixaFaccao.findOne({ key: "caixa_principal" }),
+      MovimentacaoCaixa.find().sort({ registradoEm: -1, createdAt: -1 }).limit(100)
+    ]);
 
     res.json({
-      ok: true,
-      registro
+      caixa,
+      movimentacoesCaixa
     });
   } catch (error) {
-    console.error("Erro em /api/farm/manual:", error);
-    res.status(500).json({ error: "Erro ao registrar farm manual." });
-  }
-});
-
-/*
-  Rota para o BOT gravar farm no mesmo banco.
-  Depois podemos proteger com token interno.
-*/
-router.post("/farm/bot", async (req, res) => {
-  try {
-    const { userId, username, cargo, valor, observacao } = req.body;
-
-    if (!userId || !username || !cargo || !valor) {
-      return res.status(400).json({ error: "Dados incompletos." });
-    }
-
-    const valorNumero = Number(valor);
-
-    if (Number.isNaN(valorNumero) || valorNumero <= 0) {
-      return res.status(400).json({ error: "Valor inválido." });
-    }
-
-    const semana = getSemanaRP();
-
-    const registro = await FarmRegistro.create({
-      userId,
-      username,
-      cargo,
-      valor: valorNumero,
-      semanaId: semana.semanaId,
-      registradoEm: new Date(),
-      origem: "bot",
-      observacao: observacao || ""
-    });
-
-    res.json({
-      ok: true,
-      registro
-    });
-  } catch (error) {
-    console.error("Erro em /api/farm/bot:", error);
-    res.status(500).json({ error: "Erro ao registrar farm do bot." });
+    console.error("Erro em /api/financeiro:", error);
+    res.status(500).json({ error: "Erro ao buscar financeiro." });
   }
 });
 

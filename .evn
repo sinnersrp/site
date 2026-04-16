@@ -1,9 +1,0 @@
-PORT=3000
-MONGO_URI=mongodb://sinners_rp:Sinners123@ac-ayqq7sv-shard-00-00.rvnyqkx.mongodb.net:27017,ac-ayqq7sv-shard-00-01.rvnyqkx.mongodb.net:27017,ac-ayqq7sv-shard-00-02.rvnyqkx.mongodb.net:27017/rpbot?ssl=true&replicaSet=atlas-uhtmuf-shard-0&authSource=admin&retryWrites=true&w=majority&appName=Cluster0
-SESSION_SECRET=Sinners123
-DISCORD_CLIENT_ID=1487911911067619489
-DISCORD_CLIENT_SECRET=tMZMa00cECcXnWV0DIu5tHp7Sc6Hw2dV
-DISCORD_CALLBACK_URL=http://localhost:3000/auth/discord/callback
-DISCORD_GUILD_ID=1480507564189024257
-
-NODE_ENV=development

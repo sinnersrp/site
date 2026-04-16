@@ -10,6 +10,44 @@
   </p>
 </section>
 
+<section class="container grid">
+  <div class="card">
+    <h3>Farm da semana</h3>
+    <p class="big">R$ <%= Number(resumoFarmSemana.total || 0).toLocaleString("pt-BR") %></p>
+    <p class="muted"><%= resumoFarmSemana.registros %> registros</p>
+  </div>
+
+  <div class="card">
+    <h3>Comprovantes enviados</h3>
+    <p class="big"><%= resumoFarmSemana.comprovantes %></p>
+  </div>
+
+  <div class="card">
+    <h3>Membros no ranking</h3>
+    <p class="big"><%= ranking.length %></p>
+  </div>
+</section>
+
+<section class="container grid">
+  <div class="card">
+    <h3>Caixa atual</h3>
+    <p class="big">R$ <%= Number(caixa.caixaTotal || 0).toLocaleString("pt-BR") %></p>
+  </div>
+
+  <div class="card">
+    <h3>Sujo disponível</h3>
+    <p class="big">R$ <%= Number(caixa.dinheiroSujoDisponivel || 0).toLocaleString("pt-BR") %></p>
+  </div>
+
+  <div class="card">
+    <h3>Total lavado</h3>
+    <p class="big">R$ <%= Number(caixa.totalLavado || 0).toLocaleString("pt-BR") %></p>
+    <% if (caixa.ultimaSincronizacao) { %>
+      <p class="muted">Atualizado em <%= new Date(caixa.ultimaSincronizacao).toLocaleString("pt-BR") %></p>
+    <% } %>
+  </div>
+</section>
+
 <section class="container card">
   <h2>Ranking semanal de farm</h2>
 
@@ -25,7 +63,9 @@
           <th>Meta</th>
           <th>Falta</th>
           <th>%</th>
+          <th>Registros</th>
           <th>Status</th>
+          <th>Comprovante</th>
         </tr>
       </thead>
       <tbody>
@@ -33,11 +73,19 @@
           <tr>
             <td><%= item.username %></td>
             <td><%= item.cargo %></td>
-            <td>R$ <%= item.total.toLocaleString("pt-BR") %></td>
-            <td>R$ <%= item.meta.toLocaleString("pt-BR") %></td>
-            <td>R$ <%= item.falta.toLocaleString("pt-BR") %></td>
+            <td>R$ <%= Number(item.total || 0).toLocaleString("pt-BR") %></td>
+            <td>R$ <%= Number(item.meta || 0).toLocaleString("pt-BR") %></td>
+            <td>R$ <%= Number(item.falta || 0).toLocaleString("pt-BR") %></td>
             <td><%= item.percentual.toFixed(1) %>%</td>
-            <td><%= item.status %></td>
+            <td><%= item.registros %></td>
+            <td><span class="badge <%= item.status === 'Bateu meta' ? 'badge-success' : 'badge-warning' %>"><%= item.status %></span></td>
+            <td>
+              <% if (item.ultimoComprovante) { %>
+                <a class="table-link" href="<%= item.ultimoComprovante %>" target="_blank" rel="noopener noreferrer">Abrir</a>
+              <% } else { %>
+                <span class="muted">Sem link</span>
+              <% } %>
+            </td>
           </tr>
         <% }) %>
       </tbody>
@@ -45,10 +93,17 @@
   <% } %>
 </section>
 
-<section class="container grid">
+<section class="container grid admin-split">
   <div class="card">
-    <h2>Estoque atual</h2>
+    <h2>Resumo do estoque</h2>
+    <div class="list-stat">
+      <div><span>Itens cadastrados</span><strong><%= resumoEstoque.totalItens %></strong></div>
+      <div><span>Quantidade total</span><strong><%= resumoEstoque.totalQuantidade %></strong></div>
+      <div><span>Itens gerais</span><strong><%= resumoEstoque.totalGerais %></strong></div>
+      <div><span>Armas</span><strong><%= resumoEstoque.totalArmas %></strong></div>
+    </div>
 
+    <h3 class="section-gap">Estoque atual</h3>
     <% if (!estoque.length) { %>
       <p>Sem itens no estoque.</p>
     <% } else { %>
@@ -72,34 +127,65 @@
       </table>
     <% } %>
   </div>
+
+  <div class="card">
+    <h2>Últimas movimentações do baú</h2>
+
+    <% if (!movimentacoes.length) { %>
+      <p>Nenhuma movimentação encontrada.</p>
+    <% } else { %>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Usuário</th>
+            <th>Ação</th>
+            <th>Origem</th>
+            <th>Item</th>
+            <th>Qtd</th>
+            <th>Data</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% movimentacoes.forEach(item => { %>
+            <tr>
+              <td><%= item.username %></td>
+              <td><%= item.acaoLabel %></td>
+              <td><%= item.tipoLabel %></td>
+              <td><%= item.itemOriginal || item.item %></td>
+              <td><%= item.quantidade %></td>
+              <td><%= new Date(item.registradoEm || item.createdAt).toLocaleString("pt-BR") %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  </div>
 </section>
 
 <section class="container card">
-  <h2>Últimas movimentações do baú</h2>
+  <h2>Movimentações do caixa</h2>
 
-  <% if (!movimentacoes.length) { %>
-    <p>Nenhuma movimentação encontrada.</p>
+  <% if (!movimentacoesCaixa.length) { %>
+    <p>Nenhuma movimentação financeira encontrada.</p>
   <% } else { %>
     <table class="table">
       <thead>
         <tr>
-          <th>Usuário</th>
-          <th>Ação</th>
-          <th>Item</th>
-          <th>Qtd</th>
+          <th>Responsável</th>
           <th>Tipo</th>
+          <th>Valor</th>
+          <th>Observação</th>
           <th>Data</th>
         </tr>
       </thead>
       <tbody>
-        <% movimentacoes.forEach(item => { %>
+        <% movimentacoesCaixa.forEach(item => { %>
           <tr>
-            <td><%= item.username %></td>
-            <td><%= item.acao %></td>
-            <td><%= item.item %></td>
-            <td><%= item.quantidade %></td>
+            <td><%= item.responsavelTag %></td>
             <td><%= item.tipo %></td>
-            <td><%= new Date(item.createdAt).toLocaleString("pt-BR") %></td>
+            <td>R$ <%= Number(item.valor || 0).toLocaleString("pt-BR") %></td>
+            <td><%= item.observacao || "-" %></td>
+            <td><%= new Date(item.registradoEm || item.createdAt).toLocaleString("pt-BR") %></td>
           </tr>
         <% }) %>
       </tbody>
