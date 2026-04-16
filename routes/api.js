@@ -3,29 +3,30 @@ const { ensureAuth, ensureLeader } = require("../middleware/auth");
 const ControleBau = require("../models/ControleBau");
 const MovimentacaoBau = require("../models/MovimentacaoBau");
 const FarmRegistro = require("../models/FarmRegistro");
-const CaixaFaccao = require("../models/CaixaFaccao");
-const MovimentacaoCaixa = require("../models/MovimentacaoCaixa");
 const getSemanaRP = require("../utils/semanaRP");
 const { metas } = require("../config/metas");
 
 const router = express.Router();
 
+function calcularStatusMeta(total, meta) {
+  if (total >= meta) return "batida";
+  if (total >= meta * 0.7) return "quase";
+  return "pendente";
+}
+
 router.get("/me", ensureAuth, async (req, res) => {
   try {
     const semana = getSemanaRP();
 
-    const [registros, caixa] = await Promise.all([
-      FarmRegistro.find({
-        userId: req.user.discordId,
-        registradoEm: {
-          $gte: semana.inicio,
-          $lte: semana.fim
-        }
-      }).sort({ registradoEm: -1 }),
-      CaixaFaccao.findOne({ key: "caixa_principal" })
-    ]);
+    const registros = await FarmRegistro.find({
+      userId: req.user.discordId,
+      registradoEm: {
+        $gte: semana.inicio,
+        $lte: semana.fim
+      }
+    }).sort({ registradoEm: -1 });
 
-    const totalFarm = registros.reduce((acc, item) => acc + (Number(item.valor) || 0), 0);
+    const totalFarm = registros.reduce((acc, item) => acc + Number(item.valor || 0), 0);
     const meta = metas[req.user.role] || 100000;
 
     res.json({
@@ -42,9 +43,8 @@ router.get("/me", ensureAuth, async (req, res) => {
       meta,
       falta: Math.max(meta - totalFarm, 0),
       percentual: meta > 0 ? Math.min((totalFarm / meta) * 100, 100) : 0,
-      statusMeta: totalFarm >= meta ? "batida" : "pendente",
-      registros,
-      caixa: caixa || null
+      statusMeta: calcularStatusMeta(totalFarm, meta),
+      registros
     });
   } catch (error) {
     console.error("Erro em /api/me:", error);
@@ -54,8 +54,13 @@ router.get("/me", ensureAuth, async (req, res) => {
 
 router.get("/estoque", ensureLeader, async (req, res) => {
   try {
-    const estoque = await ControleBau.find().sort({ tipo: 1, item: 1 });
-    res.json(estoque);
+    const estoque = await ControleBau.find().sort({ item: 1 });
+
+    res.json({
+      totalItens: estoque.length,
+      totalQuantidade: estoque.reduce((acc, item) => acc + Number(item.quantidade || 0), 0),
+      itens: estoque
+    });
   } catch (error) {
     console.error("Erro em /api/estoque:", error);
     res.status(500).json({ error: "Erro ao buscar estoque." });
@@ -65,10 +70,13 @@ router.get("/estoque", ensureLeader, async (req, res) => {
 router.get("/movimentacoes", ensureLeader, async (req, res) => {
   try {
     const movimentacoes = await MovimentacaoBau.find()
-      .sort({ registradoEm: -1, createdAt: -1 })
+      .sort({ createdAt: -1 })
       .limit(100);
 
-    res.json(movimentacoes);
+    res.json({
+      total: movimentacoes.length,
+      movimentacoes
+    });
   } catch (error) {
     console.error("Erro em /api/movimentacoes:", error);
     res.status(500).json({ error: "Erro ao buscar movimentações." });
@@ -89,18 +97,19 @@ router.get("/ranking", ensureLeader, async (req, res) => {
     const rankingMap = {};
 
     for (const registro of farmSemana) {
-      const cargoBase = registro.cargo === "ajuste" ? "membro" : registro.cargo;
       if (!rankingMap[registro.userId]) {
         rankingMap[registro.userId] = {
           userId: registro.userId,
           username: registro.username,
-          cargo: cargoBase,
+          cargo: registro.cargo,
           total: 0,
-          meta: metas[cargoBase] || 100000
+          meta: metas[registro.cargo] || 100000,
+          registros: 0
         };
       }
 
-      rankingMap[registro.userId].total += Number(registro.valor) || 0;
+      rankingMap[registro.userId].total += Number(registro.valor || 0);
+      rankingMap[registro.userId].registros += 1;
     }
 
     const ranking = Object.values(rankingMap)
@@ -108,31 +117,129 @@ router.get("/ranking", ensureLeader, async (req, res) => {
         ...item,
         falta: Math.max(item.meta - item.total, 0),
         percentual: item.meta > 0 ? Math.min((item.total / item.meta) * 100, 100) : 0,
-        status: item.total >= item.meta ? "Bateu meta" : "Pendente"
+        status: calcularStatusMeta(item.total, item.meta)
       }))
       .sort((a, b) => b.total - a.total);
 
-    res.json({ semana, ranking });
+    res.json({
+      semana,
+      resumo: {
+        totalFarm: farmSemana.reduce((acc, item) => acc + Number(item.valor || 0), 0),
+        totalRegistros: farmSemana.length,
+        membrosAtivos: ranking.length
+      },
+      ranking
+    });
   } catch (error) {
     console.error("Erro em /api/ranking:", error);
     res.status(500).json({ error: "Erro ao buscar ranking." });
   }
 });
 
-router.get("/financeiro", ensureLeader, async (req, res) => {
+router.get("/resumo", ensureLeader, async (req, res) => {
   try {
-    const [caixa, movimentacoesCaixa] = await Promise.all([
-      CaixaFaccao.findOne({ key: "caixa_principal" }),
-      MovimentacaoCaixa.find().sort({ registradoEm: -1, createdAt: -1 }).limit(100)
+    const semana = getSemanaRP();
+
+    const [farmSemana, estoque, movimentacoes] = await Promise.all([
+      FarmRegistro.find({
+        registradoEm: {
+          $gte: semana.inicio,
+          $lte: semana.fim
+        }
+      }),
+      ControleBau.find(),
+      MovimentacaoBau.find().sort({ createdAt: -1 }).limit(20)
     ]);
 
     res.json({
-      caixa,
-      movimentacoesCaixa
+      semana,
+      farm: {
+        total: farmSemana.reduce((acc, item) => acc + Number(item.valor || 0), 0),
+        registros: farmSemana.length
+      },
+      estoque: {
+        itens: estoque.length,
+        quantidadeTotal: estoque.reduce((acc, item) => acc + Number(item.quantidade || 0), 0)
+      },
+      movimentacoes
     });
   } catch (error) {
-    console.error("Erro em /api/financeiro:", error);
-    res.status(500).json({ error: "Erro ao buscar financeiro." });
+    console.error("Erro em /api/resumo:", error);
+    res.status(500).json({ error: "Erro ao buscar resumo." });
+  }
+});
+
+router.post("/farm/manual", ensureLeader, async (req, res) => {
+  try {
+    const { userId, username, cargo, valor, observacao } = req.body;
+
+    if (!userId || !username || !cargo || !valor) {
+      return res.status(400).json({ error: "Dados incompletos." });
+    }
+
+    const valorNumero = Number(valor);
+
+    if (Number.isNaN(valorNumero) || valorNumero <= 0) {
+      return res.status(400).json({ error: "Valor inválido." });
+    }
+
+    const semana = getSemanaRP();
+
+    const registro = await FarmRegistro.create({
+      userId,
+      username,
+      cargo,
+      valor: valorNumero,
+      semanaId: semana.semanaId,
+      registradoEm: new Date(),
+      origem: "site",
+      observacao: observacao || ""
+    });
+
+    res.json({
+      ok: true,
+      registro
+    });
+  } catch (error) {
+    console.error("Erro em /api/farm/manual:", error);
+    res.status(500).json({ error: "Erro ao registrar farm manual." });
+  }
+});
+
+router.post("/farm/bot", async (req, res) => {
+  try {
+    const { userId, username, cargo, valor, observacao } = req.body;
+
+    if (!userId || !username || !cargo || !valor) {
+      return res.status(400).json({ error: "Dados incompletos." });
+    }
+
+    const valorNumero = Number(valor);
+
+    if (Number.isNaN(valorNumero) || valorNumero <= 0) {
+      return res.status(400).json({ error: "Valor inválido." });
+    }
+
+    const semana = getSemanaRP();
+
+    const registro = await FarmRegistro.create({
+      userId,
+      username,
+      cargo,
+      valor: valorNumero,
+      semanaId: semana.semanaId,
+      registradoEm: new Date(),
+      origem: "bot",
+      observacao: observacao || ""
+    });
+
+    res.json({
+      ok: true,
+      registro
+    });
+  } catch (error) {
+    console.error("Erro em /api/farm/bot:", error);
+    res.status(500).json({ error: "Erro ao registrar farm do bot." });
   }
 });
 

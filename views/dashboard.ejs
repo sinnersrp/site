@@ -2,116 +2,197 @@
 
 <section class="profile-box container">
   <img src="<%= user.avatar %>" alt="avatar" class="avatar">
-  <div>
+  <div class="profile-content">
+    <span class="profile-badge">PAINEL PESSOAL</span>
     <h1><%= user.globalName || user.username %></h1>
     <p>@<%= user.username %></p>
-    <p>Cargo principal: <strong><%= user.role %></strong></p>
-    <p>
-      Cargos no sistema:
+    <div class="role-line">
+      <span class="tag role-tag"><%= user.role %></span>
       <% if (user.siteRoles && user.siteRoles.length) { %>
-        <strong><%= user.siteRoles.join(", ") %></strong>
+        <% user.siteRoles.forEach(role => { %>
+          <span class="tag"><%= role %></span>
+        <% }) %>
       <% } else { %>
-        <strong>nenhum reconhecido</strong>
+        <span class="tag tag-muted">nenhum reconhecido</span>
       <% } %>
-    </p>
+    </div>
   </div>
 </section>
 
-<section class="container grid">
-  <div class="card">
-    <h3>Farm da semana</h3>
-    <p class="big">R$ <%= totalFarm.toLocaleString("pt-BR") %></p>
-  </div>
+<section class="container hero-panel">
+  <div class="hero-panel-card">
+    <div>
+      <p class="eyebrow">SEU FARM DA SEMANA</p>
+      <h2>R$ <%= totalFarm.toLocaleString("pt-BR") %></h2>
+      <p class="muted">
+        Meta: R$ <%= metaSemanal.toLocaleString("pt-BR") %> ·
+        Falta: R$ <%= falta.toLocaleString("pt-BR") %>
+      </p>
+    </div>
 
-  <div class="card">
-    <h3>Meta semanal</h3>
-    <p class="big">R$ <%= metaSemanal.toLocaleString("pt-BR") %></p>
-  </div>
-
-  <div class="card">
-    <h3>Falta bater</h3>
-    <p class="big">R$ <%= falta.toLocaleString("pt-BR") %></p>
-  </div>
-</section>
-
-<section class="container grid">
-  <div class="card">
-    <h3>Status da meta</h3>
-    <p class="big"><%= statusMeta === "batida" ? "✅ Batida" : "⏳ Pendente" %></p>
-  </div>
-
-  <div class="card">
-    <h3>Progresso</h3>
-    <div class="progress-wrap">
-      <div class="progress-bar">
-        <div class="progress-fill" style="width: <%= percentual %>%"></div>
+    <div class="hero-progress">
+      <div class="progress-ring">
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: <%= percentual %>%"></div>
+        </div>
+        <strong><%= percentual.toFixed(1) %>%</strong>
       </div>
-      <p><strong><%= percentual.toFixed(1) %>%</strong> concluído</p>
+
+      <span class="status-pill status-<%= statusMeta %>">
+        <% if (statusMeta === "batida") { %>Meta batida<% } %>
+        <% if (statusMeta === "quase") { %>Quase lá<% } %>
+        <% if (statusMeta === "pendente") { %>Meta pendente<% } %>
+      </span>
+    </div>
+  </div>
+</section>
+
+<section class="container grid grid-4">
+  <div class="card stat-card">
+    <p class="stat-label">Minha posição</p>
+    <p class="big"><%= minhaPosicao || "-" %>º</p>
+    <p class="muted">No ranking da semana</p>
+  </div>
+
+  <div class="card stat-card">
+    <p class="stat-label">Farm da facção</p>
+    <p class="big">R$ <%= totalFarmFaccao.toLocaleString("pt-BR") %></p>
+    <p class="muted">Total somado da semana</p>
+  </div>
+
+  <div class="card stat-card">
+    <p class="stat-label">Membros ativos</p>
+    <p class="big"><%= totalMembros %></p>
+    <p class="muted">Com farm registrado</p>
+  </div>
+
+  <div class="card stat-card">
+    <p class="stat-label">Resumo do baú</p>
+    <p class="big"><%= estoqueResumo.quantidadeTotal %></p>
+    <p class="muted"><%= estoqueResumo.itens %> tipos de itens</p>
+  </div>
+</section>
+
+<section class="container two-columns">
+  <div class="card">
+    <div class="card-header">
+      <h2>Semana RP</h2>
+      <span class="tag">Atual</span>
+    </div>
+
+    <div class="list-details">
+      <div class="detail-row">
+        <span>Início</span>
+        <strong><%= new Date(semana.inicio).toLocaleString("pt-BR") %></strong>
+      </div>
+      <div class="detail-row">
+        <span>Fim</span>
+        <strong><%= new Date(semana.fim).toLocaleString("pt-BR") %></strong>
+      </div>
+      <div class="detail-row">
+        <span>Seu status</span>
+        <strong>
+          <% if (statusMeta === "batida") { %>✅ Meta batida<% } %>
+          <% if (statusMeta === "quase") { %>🟣 Quase lá<% } %>
+          <% if (statusMeta === "pendente") { %>⏳ Pendente<% } %>
+        </strong>
+      </div>
     </div>
   </div>
 
   <div class="card">
-    <h3>Semana RP</h3>
-    <p><strong>Início:</strong> <%= new Date(semana.inicio).toLocaleString("pt-BR") %></p>
-    <p><strong>Fim:</strong> <%= new Date(semana.fim).toLocaleString("pt-BR") %></p>
-  </div>
-</section>
+    <div class="card-header">
+      <h2>Top 5 da semana</h2>
+      <span class="tag">Ranking</span>
+    </div>
 
-<section class="container grid">
-  <div class="card">
-    <h3>Sujo total da facção</h3>
-    <p class="big">R$ <%= Number(caixa.dinheiroSujoTotal || 0).toLocaleString("pt-BR") %></p>
-  </div>
-
-  <div class="card">
-    <h3>Família recebe</h3>
-    <p class="big">R$ <%= Number(caixa.caixaTotal || 0).toLocaleString("pt-BR") %></p>
-  </div>
-
-  <div class="card">
-    <h3>Limpo estimado</h3>
-    <p class="big">R$ <%= Number(caixa.dinheiroLimpoTotal || 0).toLocaleString("pt-BR") %></p>
-    <% if (caixa.ultimaSincronizacao) { %>
-      <p class="muted">Atualizado em <%= new Date(caixa.ultimaSincronizacao).toLocaleString("pt-BR") %></p>
+    <% if (!topRanking.length) { %>
+      <p class="muted">Ainda não há ranking nesta semana.</p>
+    <% } else { %>
+      <div class="ranking-list">
+        <% topRanking.forEach((item, index) => { %>
+          <div class="ranking-item">
+            <div class="ranking-left">
+              <span class="ranking-position"><%= index + 1 %></span>
+              <div>
+                <strong><%= item.username %></strong>
+                <p><%= item.cargo %></p>
+              </div>
+            </div>
+            <div class="ranking-right">
+              <strong>R$ <%= item.total.toLocaleString("pt-BR") %></strong>
+              <span class="mini-status mini-<%= item.status %>">
+                <% if (item.status === "batida") { %>bateu<% } %>
+                <% if (item.status === "quase") { %>quase<% } %>
+                <% if (item.status === "pendente") { %>pendente<% } %>
+              </span>
+            </div>
+          </div>
+        <% }) %>
+      </div>
     <% } %>
   </div>
 </section>
 
-<section class="container card">
-  <h2>Meus registros de farm</h2>
+<section class="container two-columns">
+  <div class="card">
+    <div class="card-header">
+      <h2>Meus registros de farm</h2>
+      <span class="tag"><%= meusRegistros.length %> registros</span>
+    </div>
 
-  <% if (!meusRegistros.length) { %>
-    <p>Nenhum registro de farm nesta semana.</p>
-  <% } else { %>
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Valor</th>
-          <th>Cargo</th>
-          <th>Origem</th>
-          <th>Comprovante</th>
-          <th>Data</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% meusRegistros.forEach(item => { %>
+    <% if (!meusRegistros.length) { %>
+      <p class="muted">Nenhum registro de farm nesta semana.</p>
+    <% } else { %>
+      <table class="table">
+        <thead>
           <tr>
-            <td>R$ <%= Number(item.valor || 0).toLocaleString("pt-BR") %></td>
-            <td><%= item.cargo %></td>
-            <td><%= item.origem || "bot" %></td>
-            <td>
-              <% if (item.comprovante) { %>
-                <a class="table-link" href="<%= item.comprovante %>" target="_blank" rel="noopener noreferrer">Ver comprovante</a>
-              <% } else { %>
-                <span class="muted">Sem comprovante</span>
-              <% } %>
-            </td>
-            <td><%= new Date(item.registradoEm).toLocaleString("pt-BR") %></td>
+            <th>Valor</th>
+            <th>Cargo</th>
+            <th>Origem</th>
+            <th>Data</th>
           </tr>
+        </thead>
+        <tbody>
+          <% meusRegistros.forEach(item => { %>
+            <tr>
+              <td>R$ <%= Number(item.valor || 0).toLocaleString("pt-BR") %></td>
+              <td><%= item.cargo %></td>
+              <td><%= item.origem || "bot" %></td>
+              <td><%= new Date(item.registradoEm).toLocaleString("pt-BR") %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Últimas movimentações do baú</h2>
+      <span class="tag">Recentes</span>
+    </div>
+
+    <% if (!movimentacoesRecentes.length) { %>
+      <p class="muted">Nenhuma movimentação encontrada.</p>
+    <% } else { %>
+      <div class="activity-list">
+        <% movimentacoesRecentes.forEach(item => { %>
+          <div class="activity-item">
+            <div>
+              <strong><%= item.username %></strong>
+              <p>
+                <span class="tag small-tag"><%= item.acao %></span>
+                <span><%= item.item %></span>
+                <span>· <%= item.quantidade %></span>
+              </p>
+            </div>
+            <small><%= new Date(item.createdAt).toLocaleString("pt-BR") %></small>
+          </div>
         <% }) %>
-      </tbody>
-    </table>
-  <% } %>
+      </div>
+    <% } %>
+  </div>
 </section>
 
 <%- include("partials/footer") %>

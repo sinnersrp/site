@@ -3,62 +3,15 @@ const { ensureAuth, ensureLeader } = require("../middleware/auth");
 const ControleBau = require("../models/ControleBau");
 const MovimentacaoBau = require("../models/MovimentacaoBau");
 const FarmRegistro = require("../models/FarmRegistro");
-const CaixaFaccao = require("../models/CaixaFaccao");
-const MovimentacaoCaixa = require("../models/MovimentacaoCaixa");
 const getSemanaRP = require("../utils/semanaRP");
 const { metas } = require("../config/metas");
 
 const router = express.Router();
 
-function normalizarAcaoMovimentacao(item) {
-  const valor = item.acao || item.tipoMovimentacao || "movimentacao";
-
-  const mapa = {
-    entrada: "Entrada",
-    saida: "Saída",
-    transferir: "Transferência",
-    transferencia_controle: "Transferência p/ controle",
-    liberar: "Liberação",
-    retirar: "Retirada",
-    devolver: "Devolução",
-    liberou: "Liberação",
-    retirou: "Retirada",
-    devolveu: "Devolução",
-    entrada_gerencia: "Entrada gerência",
-    saida_gerencia: "Saída gerência"
-  };
-
-  return mapa[valor] || valor;
-}
-
-function normalizarTipoBau(item) {
-  if (item.tipo === "bau_gerencia") return "Baú gerência";
-  if (item.tipo === "controle_bau") return "Controle de baú";
-  return item.tipo || "-";
-}
-
-function resumirEstoque(estoque) {
-  return estoque.reduce(
-    (acc, item) => {
-      const quantidade = Number(item.quantidade) || 0;
-      acc.totalItens += 1;
-      acc.totalQuantidade += quantidade;
-
-      if (item.tipo === "arma") {
-        acc.totalArmas += quantidade;
-      } else {
-        acc.totalGerais += quantidade;
-      }
-
-      return acc;
-    },
-    {
-      totalItens: 0,
-      totalQuantidade: 0,
-      totalGerais: 0,
-      totalArmas: 0
-    }
-  );
+function calcularStatusMeta(total, meta) {
+  if (total >= meta) return "batida";
+  if (total >= meta * 0.7) return "quase";
+  return "pendente";
 }
 
 router.get("/", (req, res) => {
@@ -72,7 +25,7 @@ router.get("/dashboard", ensureAuth, async (req, res) => {
   try {
     const semana = getSemanaRP();
 
-    const [meusRegistros, caixa] = await Promise.all([
+    const [meusRegistros, farmSemana, estoque, movimentacoesRecentes] = await Promise.all([
       FarmRegistro.find({
         userId: req.user.discordId,
         registradoEm: {
@@ -80,16 +33,62 @@ router.get("/dashboard", ensureAuth, async (req, res) => {
           $lte: semana.fim
         }
       }).sort({ registradoEm: -1 }),
-      CaixaFaccao.findOne({ key: "caixa_principal" })
+
+      FarmRegistro.find({
+        registradoEm: {
+          $gte: semana.inicio,
+          $lte: semana.fim
+        }
+      }).sort({ registradoEm: -1 }),
+
+      ControleBau.find().sort({ item: 1 }),
+
+      MovimentacaoBau.find().sort({ createdAt: -1 }).limit(8)
     ]);
 
-    const totalFarm = meusRegistros.reduce((acc, item) => acc + (Number(item.valor) || 0), 0);
+    const totalFarm = meusRegistros.reduce((acc, item) => acc + Number(item.valor || 0), 0);
     const metaSemanal = metas[req.user.role] || 100000;
     const falta = Math.max(metaSemanal - totalFarm, 0);
     const percentual = metaSemanal > 0
       ? Math.min((totalFarm / metaSemanal) * 100, 100)
       : 0;
-    const statusMeta = totalFarm >= metaSemanal ? "batida" : "pendente";
+    const statusMeta = calcularStatusMeta(totalFarm, metaSemanal);
+
+    const rankingMap = {};
+
+    for (const registro of farmSemana) {
+      if (!rankingMap[registro.userId]) {
+        rankingMap[registro.userId] = {
+          userId: registro.userId,
+          username: registro.username,
+          cargo: registro.cargo,
+          total: 0,
+          meta: metas[registro.cargo] || 100000
+        };
+      }
+
+      rankingMap[registro.userId].total += Number(registro.valor || 0);
+    }
+
+    const ranking = Object.values(rankingMap)
+      .map((item) => ({
+        ...item,
+        falta: Math.max(item.meta - item.total, 0),
+        percentual: item.meta > 0 ? Math.min((item.total / item.meta) * 100, 100) : 0,
+        status: calcularStatusMeta(item.total, item.meta)
+      }))
+      .sort((a, b) => b.total - a.total);
+
+    const minhaPosicao = ranking.findIndex((item) => item.userId === req.user.discordId) + 1;
+    const topRanking = ranking.slice(0, 5);
+
+    const totalFarmFaccao = farmSemana.reduce((acc, item) => acc + Number(item.valor || 0), 0);
+    const totalMembros = ranking.length;
+
+    const estoqueResumo = {
+      itens: estoque.length,
+      quantidadeTotal: estoque.reduce((acc, item) => acc + Number(item.quantidade || 0), 0)
+    };
 
     res.render("dashboard", {
       title: "Meu Painel",
@@ -101,14 +100,13 @@ router.get("/dashboard", ensureAuth, async (req, res) => {
       percentual,
       statusMeta,
       meusRegistros,
-      caixa: caixa || {
-        dinheiroSujoTotal: 0,
-        dinheiroSujoDisponivel: 0,
-        dinheiroLimpoTotal: 0,
-        totalLavado: 0,
-        caixaTotal: 0,
-        ultimaSincronizacao: null
-      }
+      ranking,
+      topRanking,
+      minhaPosicao,
+      totalFarmFaccao,
+      totalMembros,
+      estoqueResumo,
+      movimentacoesRecentes
     });
   } catch (error) {
     console.error("Erro no dashboard:", error);
@@ -124,41 +122,33 @@ router.get("/admin", ensureLeader, async (req, res) => {
   try {
     const semana = getSemanaRP();
 
-    const [estoque, movimentacoes, farmSemana, caixa, movimentacoesCaixa] = await Promise.all([
-      ControleBau.find().sort({ tipo: 1, item: 1 }),
-      MovimentacaoBau.find().sort({ registradoEm: -1, createdAt: -1 }).limit(30),
+    const [estoque, movimentacoes, farmSemana] = await Promise.all([
+      ControleBau.find().sort({ item: 1 }),
+      MovimentacaoBau.find().sort({ createdAt: -1 }).limit(40),
       FarmRegistro.find({
         registradoEm: {
           $gte: semana.inicio,
           $lte: semana.fim
         }
-      }).sort({ registradoEm: -1 }),
-      CaixaFaccao.findOne({ key: "caixa_principal" }),
-      MovimentacaoCaixa.find().sort({ registradoEm: -1, createdAt: -1 }).limit(20)
+      }).sort({ registradoEm: -1 })
     ]);
 
     const rankingMap = {};
 
     for (const registro of farmSemana) {
-      const cargoBase = registro.cargo === "ajuste" ? "membro" : registro.cargo;
-
       if (!rankingMap[registro.userId]) {
         rankingMap[registro.userId] = {
           userId: registro.userId,
           username: registro.username,
-          cargo: cargoBase,
+          cargo: registro.cargo,
           total: 0,
-          meta: metas[cargoBase] || 100000,
-          registros: 0,
-          ultimoComprovante: registro.comprovante || ""
+          meta: metas[registro.cargo] || 100000,
+          registros: 0
         };
       }
 
-      rankingMap[registro.userId].total += Number(registro.valor) || 0;
+      rankingMap[registro.userId].total += Number(registro.valor || 0);
       rankingMap[registro.userId].registros += 1;
-      if (!rankingMap[registro.userId].ultimoComprovante && registro.comprovante) {
-        rankingMap[registro.userId].ultimoComprovante = registro.comprovante;
-      }
     }
 
     const ranking = Object.values(rankingMap)
@@ -166,48 +156,45 @@ router.get("/admin", ensureLeader, async (req, res) => {
         ...item,
         falta: Math.max(item.meta - item.total, 0),
         percentual: item.meta > 0 ? Math.min((item.total / item.meta) * 100, 100) : 0,
-        status: item.total >= item.meta ? "Bateu meta" : "Pendente"
+        status: calcularStatusMeta(item.total, item.meta)
       }))
       .sort((a, b) => b.total - a.total);
 
-    const resumoFarmSemana = farmSemana.reduce(
-      (acc, item) => {
-        acc.total += Number(item.valor) || 0;
-        acc.registros += 1;
-        if (item.comprovante) acc.comprovantes += 1;
-        return acc;
-      },
-      { total: 0, registros: 0, comprovantes: 0 }
-    );
+    const pendentes = ranking.filter((item) => item.total < item.meta);
+    const bateramMeta = ranking.filter((item) => item.total >= item.meta);
 
-    const resumoEstoque = resumirEstoque(estoque);
-
-    const caixaResumo = caixa || {
-      dinheiroSujoTotal: 0,
-      dinheiroSujoDisponivel: 0,
-      dinheiroLimpoTotal: 0,
-      totalLavado: 0,
-      caixaTotal: 0,
-      ultimaSincronizacao: null
+    const resumoFarm = {
+      totalFarm: farmSemana.reduce((acc, item) => acc + Number(item.valor || 0), 0),
+      totalRegistros: farmSemana.length,
+      membrosAtivos: ranking.length,
+      bateramMeta: bateramMeta.length,
+      pendentes: pendentes.length
     };
 
-    const movimentacoesFormatadas = movimentacoes.map((item) => ({
-      ...item.toObject(),
-      acaoLabel: normalizarAcaoMovimentacao(item),
-      tipoLabel: normalizarTipoBau(item)
-    }));
+    const resumoEstoque = {
+      totalItens: estoque.length,
+      totalQuantidade: estoque.reduce((acc, item) => acc + Number(item.quantidade || 0), 0)
+    };
+
+    const topItens = [...estoque]
+      .sort((a, b) => Number(b.quantidade || 0) - Number(a.quantidade || 0))
+      .slice(0, 8);
+
+    const ultimosFarms = farmSemana.slice(0, 10);
 
     res.render("admin", {
       title: "Painel da Liderança",
       user: req.user,
       semana,
       estoque,
-      resumoEstoque,
-      movimentacoes: movimentacoesFormatadas,
+      movimentacoes,
       ranking,
-      resumoFarmSemana,
-      caixa: caixaResumo,
-      movimentacoesCaixa
+      pendentes,
+      bateramMeta,
+      resumoFarm,
+      resumoEstoque,
+      topItens,
+      ultimosFarms
     });
   } catch (error) {
     console.error("Erro no admin:", error);
